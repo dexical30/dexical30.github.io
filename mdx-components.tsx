@@ -1,22 +1,49 @@
 import type { MDXComponents } from 'mdx/types';
+import { slugify } from '@/lib/toc';
+
+// children에서 텍스트 추출
+function getTextFromChildren(children: any): string {
+  if (typeof children === 'string') {
+    return children;
+  }
+  if (Array.isArray(children)) {
+    return children.map(getTextFromChildren).join('');
+  }
+  if (children?.props?.children) {
+    return getTextFromChildren(children.props.children);
+  }
+  return '';
+}
 
 export const mdxComponents: MDXComponents = {
   // 헤딩
-  h1: ({ children }) => (
-    <h1 className="text-4xl font-bold mt-8 mb-4 text-neutral-900 dark:text-neutral-100">
-      {children}
-    </h1>
-  ),
-  h2: ({ children }) => (
-    <h2 className="text-3xl font-semibold mt-8 mb-3 text-neutral-900 dark:text-neutral-100">
-      {children}
-    </h2>
-  ),
-  h3: ({ children }) => (
-    <h3 className="text-2xl font-semibold mt-6 mb-3 text-neutral-800 dark:text-neutral-200">
-      {children}
-    </h3>
-  ),
+  h1: ({ children }) => {
+    const text = getTextFromChildren(children);
+    const id = slugify(text);
+    return (
+      <h1 id={id} className="text-4xl font-bold mt-8 mb-4 text-neutral-900 dark:text-neutral-100 scroll-mt-20">
+        {children}
+      </h1>
+    );
+  },
+  h2: ({ children }) => {
+    const text = getTextFromChildren(children);
+    const id = slugify(text);
+    return (
+      <h2 id={id} className="text-3xl font-semibold mt-8 mb-3 text-neutral-900 dark:text-neutral-100 scroll-mt-20">
+        {children}
+      </h2>
+    );
+  },
+  h3: ({ children }) => {
+    const text = getTextFromChildren(children);
+    const id = slugify(text);
+    return (
+      <h3 id={id} className="text-2xl font-semibold mt-6 mb-3 text-neutral-800 dark:text-neutral-200 scroll-mt-20">
+        {children}
+      </h3>
+    );
+  },
   h4: ({ children }) => (
     <h4 className="text-xl font-medium mt-4 mb-2 text-neutral-800 dark:text-neutral-200">
       {children}
