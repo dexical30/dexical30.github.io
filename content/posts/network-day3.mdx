@@ -1,10 +1,4 @@
----
-title: "TIL: 네트워크 공부 3일차"
-description: "HTTP 부터 쿠키까지"
-date: "2025-12-04"
----
-
-# ** 웹의 기본 원리 이해**
+# 웹의 기본 원리 이해
 
 ## HTTP 동작 원리
 HTTP는 Hyper Text Transfer Protocol로, 웹 리소스를 요청/응답하기 위한 프로토콜입니다.
@@ -83,31 +77,161 @@ RESTful API란 이 REST 원칙들을 잘 지켜서 설계한 API를 말하며,
 
 ### REST 제약조건
 
-| 조건                | 설명                                |
-| ----------------- | --------------------------------- |
-| Client-Server     | 클라이언트와 서버는 분리되어야 한다               |
-| Stateless         | 서버는 요청 간 클라이언트 상태를 기억하면 안된다       |
-| Cacheable         | HTTP의 캐싱 메커니즘을 활용 가능해야한다          |
-| Uniform Interface | 일관된 인터페이스를 사용해야한다.                |
-| Layered System    | 중간에 프록시, 게이트웨이, 로드밸런서 등을 둘수있다     |
-| Code On Demand    | 서버가 클라이언트에게 코드를 내려 실행시키는것(거의 사용X) |
+#### Client-Server
+클라이언트와 서버의 역할을 분리한다.
+서로 독립되어 서버를 바꿔도 클라이언트가 영향을 받지않고, 반대도 마찬가지로 영향을 받지 않도록 한다
+
+#### Stateless
+서버는 각 요청을 독립적으로 처리한다
+이전 요청 정보를 서버에 보관하지 않으므로 서버의 상태관리 비용이 없다.
+클라이언트는 필요한 정보(토큰)을 포함해서 보내도록 하여 요청이 하나의 단위로 완결될수 있도록 한다
+
+#### Cacheable
+서버 응답에 이 응답을 캐시해도 되는지/안되는지 를 명시한다
+캐시 가능한 응답은 클라이언트나 중간 Proxy가 재사용 가능하다. 트래픽 절감, 응답속도 향상, 서버 부하를 감소시킨다.
+
+#### Uniform Interface
+인터페이스의 일관성으로 클라이언트/서버 API가 명확하고 예측 가능
+- Resource Identifier - URI로 리소스 식별
+- Manipulation Through Representations - JSON, XML 등 표현을 통해 자원 조작
+- Self-Descriptive Message 메시지 자체에 데이터 + 처리방식 정보를 포함 (Content-Type)
+- Hypermedia as the Engine of Application State (HATEOAS) 응답안에 다음 가능한 행동 링크 포함
+
+#### Layered System 계층화 시스템
+클라이언트는 일반적으로 최종 서버에 직접 연결되어 있는지, 아니면 중간 중개 서버에 연결되어 있는지 알 수 없습니다. 중개 서버는 부하 분산을 활성화하고 공유 캐시를 제공하여 시스템 확장성을 향상시킬 수 있습니다. 계층은 보안 정책을 시행할 수도 있습니다.
 
 
-### Q. Cache-Control, Etag 등 캐시 메커니즘의 종류와 동작원리
+#### Code On Demand (선택사항)
+서버가 클라이언트에게 실행 가능한 코드를 보내서 기능을 동적으로 확장 가능
+- 예: 서버가 JavaScript를 내려 클라이언트 기능 보강
+
+
+### Q. Code On Demand를 보고 생각난건데, 최근에는 js 번들을 분리해서 내려주는 최적화 기법이 있다. 이부분도 Code On Demand로 볼수있는걸까?
+
+### Q. Cache-Control, Etag 등 캐시 메커니즘의 종류
+
+### Q. 캐시 매커니즘의 동작원리
 
 
 
 ## URL/URI/URN 개념 구분
+URI는 리소스를 식별하는 모든 식별자를 말하고,
+URL은 리소스의 ‘위치(주소)’를 나타내는 URI의 한 종류이며,
+URN은 리소스의 ‘이름’을 나타내는 URI의 한 종류입니다.
+즉, URI = URL + URN(을 포함한 상위 개념)입니다.
+
+### URL(Uniform Resource Locator)
+URL은 반드시 리소스의 접근 방법(프로토콜) + 위치(호스트/경로)를 포함해야 한다.
+```
+https://example.com/users/10
+ftp://myserver.com/file.txt
+```
+
+### URN
+어디에 있는지 몰라도, **그 리소스를 유일하게 식별할 수 있는 이름**을 의미한다.
+```
+urn:isbn:0451450523
+urn:uuid:6e8f9a8e-1234-4e9a-bb23-b6e70de5c123
+```
+책 ISBN번호나 고유 UUID 값 같은 위치가 변해도 이름은 변하지 않는 식별 방식이다.
+
+### Q. AWS의 URI, URN
 
 
 
 
 ---
 
-# **📙** 
+# 보안 기초
+## origin의 구성요소
+프로토콜(http/https) + 도메인 + 포트
+프로토콜, 도메인, 포트가 다른경우 같은 origin으로 평가하지 않습니다
 
-# **2단계: 보안 기초**
-## SOP / CORS
+
+## SOP(Same Origin Policy)
+브라우저가 서로 다른 출처(origin)간의 중요한 리소스 (쿠키, DOM, LocalStorage등) 을 공유하지 못하게 막는 보안정책 입니다
+
+이 정책으로 인해 악성사이트가 다른 도메인의 쿠키값에 접근하거나, LocalStroage를 접근하는것을 막을수 있습니다.
+
+## CORS(Cross Origin Resource Sharing)
+서로 다른 출처간 요청이 필요한경우 특정 Origin을 허용하도록 명시해 SOP를 부분적으로 완화하는 메커니즘입니다.
+
+### CORS 동작구조
+
+1. 클라이언트에서 요청을 보낼때 브라우저가 SOP를 체크합니다
+2. SOP위반 가능성이 있으면 Preflight Request(OPTIONS)를 전송합니다
+3. 서버가 다음 헤더를 포함해 응답합니다
+	1. Access-Control-Allow-Origin: https://client.com
+	2. Access-Control-Allow-Credential: true
+	3. Access-Control-Allow-Methods: GET, POST, PUT, DELETE
+	4. Access-Control-Allow-Headers: Content-Type, Authorization
+4. 클라이언트가 허용되는 origin인경우 요청을 마저 보냅니다
+5. 실패하는경우 CORS 오류로 요청을 차단합니다.
+
+simple request의 경우 preflight request를 보내지않고 바로 요청을 보냅니다.
+응답이 CORS를 허용하지 않는 헤더라면 JS에 전달하지않고 CORS 오류로 브라우저를 차단합니다
+
+### Access Control Allow 헤더
+
+| 이름          | 설명                                                                |
+| ----------- | ----------------------------------------------------------------- |
+| Origin      | 어떤 origin을 허용할지                                                   |
+| Credentials | 쿠키를 포함한 인증정보를 허용할지                                                |
+| Methods     | 허용할 HTTP 메서드                                                      |
+| Headers     | 허용할 헤더                                                            |
+| Max-Age     | Preflight를 캐싱하는 시간(초)입니다. 이 시간동안은 같은요청에 대해 Preflght를 다시 보내지 않습니다. |
+
+### Preflight Request
+Preflight Request는 브라우저가 Cross-Origin 요청을 보내기 전에,
+서버가 해당 요청을 허용하는지 확인하기 위해 먼저 보내는 “사전 검증 요청(OPTIONS)“이다.
+브라우저는 서버가 올바른 CORS 허용 헤더를 응답하면 그때서야 실제 요청을 전송한다
+
+### SImple Request와 Preflight Request
+| **구분**           | **Simple Request**                                     | **Preflight Request** |
+| ---------------- | ------------------------------------------------------ | --------------------- |
+| OPTIONS 요청 발생 여부 | ❌ 없음                                                   | ✔ 있음                  |
+| 브라우저가 위험하다고 판단?  | 아니오                                                    | 예                     |
+| Method           | GET, POST, HEAD                                        | PUT, DELETE, PATCH 등  |
+| Content-Type     | x-www-form-urlencoded, text/plain, multipart/form-data | application/json 등    |
+| Custom Header 사용 | ❌ 불가                                                   | ✔ 가능                  |
+| 속도               | 빠름                                                     | OPTIONS 한 번 더 필요 → 느림 |
+| 서버 요구사항          | Allow-Origin만 있으면 됨                                    | Allow-* 헤더 다 필요함      |
+
+
+### CORS 동작구조 mermaid
+
+```mermaid
+sequenceDiagram
+    autonumber
+
+    participant Browser
+    participant Server
+
+    Note over Browser: 개발자가 fetch()/XHR 요청 수행
+    Browser->Browser: 요청이 Cross-Origin인지 확인
+
+    alt Simple Request (Preflight 필요 없음)
+        Browser->>Server: 실제 요청 (GET/POST 등)
+        Server-->>Browser: 응답 + CORS Header
+        Browser->Browser: CORS 정책 검사 후 응답 처리
+    else Preflight Request 필요 (PUT/DELETE/JSON/Custom Header 등)
+        Note over Browser: 브라우저가 먼저 Preflight(OPTIONS) 전송
+        Browser->>Server: OPTIONS / Preflight Request<br/>+ Origin, Access-Control-Request-Method,<br/>Access-Control-Request-Headers
+        Server-->>Browser: Preflight Response<br/>+ Access-Control-Allow-Origin<br/>+ Access-Control-Allow-Methods<br/>+ Access-Control-Allow-Headers<br/>+ (optional) Access-Control-Allow-Credentials
+
+        alt Preflight 성공 (허용됨)
+            Browser->>Server: 실제 요청 (Actual Request)
+            Server-->>Browser: 실제 응답 + CORS Header
+            Browser->Browser: CORS 정책 검사 후 응답 처리
+        else Preflight 실패 (허용되지 않음)
+            Server-->>Browser: 오류 응답 또는 허용 헤더 누락
+            Browser->Browser: CORS 에러 발생 (JS에는 전달되지 않음)
+        end
+    end
+```
+
+
+
 
 ## XSS
 
@@ -120,67 +244,54 @@ RESTful API란 이 REST 원칙들을 잘 지켜서 설계한 API를 말하며,
 
 ---
 
-# **📕** 
+# 서버 아키텍처 이해
 
-# **3단계: 서버 아키텍처 이해**
+## 프록시 / 포워드 프록시 / 리버스 프록시
 
-  
+## CDN / 로드 밸런싱
 
-## **목표: 확장성과 성능을 고려하는 백엔드 개발자 수준으로 성장**
+## 웹 캐시 전략
 
-1. 프록시 / 포워드 프록시 / 리버스 프록시
-    
-2. CDN / 로드 밸런싱
-    
-3. 웹 캐시 전략
-    
 
 ---
 
-# **📗** 
 
-# **4단계: 인증/인가 & 실무 고민**
+# 인증/인가
 
-  
+## JWT + Refresh Token 전략
+## 세션 기반 인증과 비교
 
-## **목표: 실전 로그인 시스템 구축**
+## Access Token 로테이션
 
-1. JWT + Refresh Token 전략
-    
-2. 세션 기반 인증과 비교
-    
-3. Access Token 로테이션
-    
-4. Token 탈취 시 대응 전략(Blacklist vs Short-lived token)
-    
+## Token 탈취 시 대응 전략(Blacklist vs Short-lived token)
+
 
 ---
 
-# **📔** 
+# 5단계: 네트워크 타임아웃
 
-# **5단계: 네트워크 타임아웃 & 실무 설정**
+## Connection Timeout
 
-1. Connection Timeout
-    
-2. Read Timeout
-    
-3. Retry 전략
-    
-4. 장애 대응 패턴(Circuit Breaker 등)
-    
+## Read Timeout 
+
+## Retry 전략
+
+## 장애 대응 패턴(Circuit Breaker 등) 
+
+
 
 ---
 
 # **📘** 
 
-# **6단계: 실전 프로젝트로 정리**
+# 실제 적용
 
-- JWT + Refresh Token 로그인 구현
-    
-- CORS를 가진 프론트–백엔드 환경 구성
-    
-- Reverse Proxy(Nginx) 세팅
-    
-- XSS/CSRF/SQl Injection 방어 실제 적용
-    
-- 캐시 정책(Cache-Control, ETag) 실험
+## Reverse Proxy(Nginx) 세팅
+
+## XSS/CSRF/SQl Injection 방어 실제 적용 
+
+## 캐시 정책(Cache-Control, ETag) 실험 
+
+
+# 참고
+> https://www.restapitutorial.com/introduction/restconstraints
