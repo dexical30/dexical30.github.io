@@ -1,0 +1,186 @@
+---
+title: "TIL: 네트워크 공부 3일차"
+description: "HTTP 부터 쿠키까지"
+date: "2025-12-04"
+---
+
+# ** 웹의 기본 원리 이해**
+
+## HTTP 동작 원리
+HTTP는 Hyper Text Transfer Protocol로, 웹 리소스를 요청/응답하기 위한 프로토콜입니다.
+
+### HTTP 특징
+
+| 특징                   | 설명                                                                    |
+| -------------------- | --------------------------------------------------------------------- |
+| 클라이언트-서버 구조          | 서버가 먼저 메시지를 시작하지 않음.                                                  |
+| Stateless            | 서버는 각 요청 간 사용자의 상태를 기억하지 않는다.                                         |
+| Request - Response기반 | HTTP는 반드시 클라이언트가 요청을 시작해야 함.                                          |
+| Connectionless       | HTTP 1.0은 **요청 → 응답 → 연결 종료** 형태였으나 http 1.1의 keep-alive 속성으로 의미가 약해짐 |
+| 텍스트 기반 프로토콜          | 요청과 응답이 사람이 읽을 수 있는 텍스트 문자열로 이루어짐.                                    |
+
+
+> keep-alive: 한 번 생성한 TCP 연결을 여러 HTTP 요청/응답에 재사용하도록 하는 메커니즘이다.
+#### 어떻게 keep-alive가 TCP handshake를 하지않고 바로 연결할까?
+한 번 handshake로 만들어진 TCP 연결을 끊지 않고 재사용하기 때문에 이후 요청에서 handshake 과정이 생략되는 것입니다
+
+연결에 대한 관리는 OS(커널)레벨에서 관리합니다
+
+#### Q. 커널에서 어떻게 관리하나요?
+
+
+## 쿠키 / 세션 / JWT 구조
+
+### 쿠키란?
+쿠키(Cookie)는 웹 서버가 클라이언트(브라우저)에 저장하는 작은 데이터로,
+HTTP가 Stateless이기 때문에 발생하는 ‘상태 유지 문제’를 해결하기 위해 사용됩니다.
+브라우저는 저장된 쿠키를 동일한 도메인으로 요청할 때 자동으로 전송하여
+서버가 사용자를 식별하거나, 로그인 상태 유지, 설정 저장 등을 할 수 있게 합니다.
+
+### 쿠키의 구성요소
+
+
+```
+Set-Cookie: sessionId=abc123; Path=/; Expires=Wed, 21 Oct 2025; 
+            HttpOnly; Secure; SameSite=Lax
+```
+
+| 이름                | 설명                                   |
+| ----------------- | ------------------------------------ |
+| name=value        | 쿠키의 실제 데이터                           |
+| Path              | 어떤 경로에서 쿠키를 포함할지 결정                  |
+| Domain            | 어떤 도메인에서 쿠키를 전송할지 결정                 |
+| Expires / Max-Age | 쿠키 만료 시점 (Max-Age: 초단위)              |
+| HttpOnly          | JavaScript에서 document.cookie로 접근 불가능 |
+| Secure            | HTTPS 요청시에만 전송                       |
+| SameSite          | CSRF 방어                              |
+브라우저 내부에 쿠키가 저장됩니다
+
+### 쿠키종류
+
+| 이름                | 설명                               |
+| ----------------- | -------------------------------- |
+| session cookie    | 브라우저 세션동안 유지되는 쿠키                |
+| persistent cookie | Expires 또는 Max-Age가 있으며 재시작해도 유지 |
+| Secure Cookie     | HTTPS에서만 전송됩니다                   |
+| HttpOnly          | JS에서 접근이 불가능한 쿠키입니다              |
+
+
+### Q. 어떻게 HttpOnly를 설정하면 JS에서 접근이 안될까?
+
+### Q. 세션쿠키가 어떻게 브라우저세션에서만 유지가될까?
+
+### Q. SameSite Lax, Strict, None의 차이점이 무엇인가?
+
+
+
+## REST / RESTful API
+
+REST(Representational State Transfer)는 웹 리소스를 “자원(Resource)”으로 보고,
+HTTP 메서드(GET/POST/PUT/DELETE 등)와 URI를 통해 자원을 표현하고 조작하는 아키텍처 스타일입니다.
+RESTful API란 이 REST 원칙들을 잘 지켜서 설계한 API를 말하며,
+리소스 중심의 URI, 표준 HTTP 메서드 사용, Stateless, 캐싱 가능 등의 특징을 가집니다.
+
+### REST 제약조건
+
+| 조건                | 설명                                |
+| ----------------- | --------------------------------- |
+| Client-Server     | 클라이언트와 서버는 분리되어야 한다               |
+| Stateless         | 서버는 요청 간 클라이언트 상태를 기억하면 안된다       |
+| Cacheable         | HTTP의 캐싱 메커니즘을 활용 가능해야한다          |
+| Uniform Interface | 일관된 인터페이스를 사용해야한다.                |
+| Layered System    | 중간에 프록시, 게이트웨이, 로드밸런서 등을 둘수있다     |
+| Code On Demand    | 서버가 클라이언트에게 코드를 내려 실행시키는것(거의 사용X) |
+
+
+### Q. Cache-Control, Etag 등 캐시 메커니즘의 종류와 동작원리
+
+
+
+## URL/URI/URN 개념 구분
+
+
+
+
+---
+
+# **📙** 
+
+# **2단계: 보안 기초**
+## SOP / CORS
+
+## XSS
+
+## CSRF
+
+## SQL Injection
+
+## HTTPS와 암호화 기본
+
+
+---
+
+# **📕** 
+
+# **3단계: 서버 아키텍처 이해**
+
+  
+
+## **목표: 확장성과 성능을 고려하는 백엔드 개발자 수준으로 성장**
+
+1. 프록시 / 포워드 프록시 / 리버스 프록시
+    
+2. CDN / 로드 밸런싱
+    
+3. 웹 캐시 전략
+    
+
+---
+
+# **📗** 
+
+# **4단계: 인증/인가 & 실무 고민**
+
+  
+
+## **목표: 실전 로그인 시스템 구축**
+
+1. JWT + Refresh Token 전략
+    
+2. 세션 기반 인증과 비교
+    
+3. Access Token 로테이션
+    
+4. Token 탈취 시 대응 전략(Blacklist vs Short-lived token)
+    
+
+---
+
+# **📔** 
+
+# **5단계: 네트워크 타임아웃 & 실무 설정**
+
+1. Connection Timeout
+    
+2. Read Timeout
+    
+3. Retry 전략
+    
+4. 장애 대응 패턴(Circuit Breaker 등)
+    
+
+---
+
+# **📘** 
+
+# **6단계: 실전 프로젝트로 정리**
+
+- JWT + Refresh Token 로그인 구현
+    
+- CORS를 가진 프론트–백엔드 환경 구성
+    
+- Reverse Proxy(Nginx) 세팅
+    
+- XSS/CSRF/SQl Injection 방어 실제 적용
+    
+- 캐시 정책(Cache-Control, ETag) 실험
