@@ -1,16 +1,22 @@
 import type { MDXComponents } from 'mdx/types';
 import { slugify } from '@/lib/toc';
+import { CodeBlock } from '@/components/code-block';
+import { Mermaid } from '@/components/mermaid';
 
 // children에서 텍스트 추출
-function getTextFromChildren(children: any): string {
+function getTextFromChildren(children: React.ReactNode): string {
   if (typeof children === 'string') {
     return children;
+  }
+  if (typeof children === 'number') {
+    return String(children);
   }
   if (Array.isArray(children)) {
     return children.map(getTextFromChildren).join('');
   }
-  if (children?.props?.children) {
-    return getTextFromChildren(children.props.children);
+  if (children && typeof children === 'object' && 'props' in children) {
+    const element = children as React.ReactElement<{ children?: React.ReactNode }>;
+    return getTextFromChildren(element.props.children);
   }
   return '';
 }
@@ -96,17 +102,42 @@ export const mdxComponents: MDXComponents = {
     </blockquote>
   ),
 
-  // 코드
-  code: ({ children }) => (
-    <code className="px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 text-sm font-mono">
-      {children}
-    </code>
-  ),
-  pre: ({ children }) => (
-    <pre className="my-4 p-4 rounded-lg bg-neutral-900 dark:bg-neutral-950 overflow-x-auto">
-      {children}
-    </pre>
-  ),
+  // 인라인 코드 (코드블럭이 아닌 `code`)
+  code: ({ children, className }) => {
+    // 코드블럭 내부의 code는 pre에서 처리하므로 여기서는 인라인만
+    // className이 있으면 코드블럭 내부이므로 그대로 반환
+    if (className) {
+      return <code className={className}>{children}</code>;
+    }
+    return (
+      <code className="px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 text-sm font-mono">
+        {children}
+      </code>
+    );
+  },
+  // 코드블럭 (pre > code)
+  pre: ({ children }) => {
+    // children에서 code 요소의 props 추출
+    const codeElement = children as React.ReactElement<{
+      children: string;
+      className?: string;
+    }>;
+    
+    const code = codeElement?.props?.children || '';
+    const className = codeElement?.props?.className || '';
+    
+    // className에서 언어 추출 (예: "language-javascript" -> "javascript")
+    const match = className.match(/language-(\w+)/);
+    const language = match ? match[1] : 'text';
+    
+    // Mermaid 다이어그램인 경우
+    if (language === 'mermaid') {
+      return <Mermaid chart={code} />;
+    }
+    
+    // 일반 코드블럭
+    return <CodeBlock language={language}>{code}</CodeBlock>;
+  },
 
   // 테이블
   table: ({ children }) => (
