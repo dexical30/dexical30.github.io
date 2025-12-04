@@ -2,7 +2,6 @@
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
 
-@custom-variant dark (&:is(.dark *));
 
 :root {
   --background: oklch(1 0 0);
@@ -133,45 +132,4 @@ body {
   body {
     @apply bg-background text-foreground;
   }
-}
-
-/* 다크모드 prose 스타일링 */
-.dark .prose {
-  color: oklch(0.92 0 0);
-}
-
-.dark .prose h1,
-.dark .prose h2,
-.dark .prose h3,
-.dark .prose h4,
-.dark .prose h5,
-.dark .prose h6 {
-  color: oklch(0.985 0 0);
-}
-
-.dark .prose strong {
-  color: oklch(0.985 0 0);
-}
-
-.dark .prose code {
-  color: oklch(0.95 0 0);
-  background-color: oklch(0.25 0 0);
-}
-
-.dark .prose pre {
-  background-color: oklch(0.2 0 0);
-  border: 1px solid oklch(0.3 0 0);
-}
-
-.dark .prose pre code {
-  background-color: transparent;
-}
-
-.dark .prose a {
-  color: oklch(0.8 0.15 250);
-}
-
-.dark .prose blockquote {
-  color: oklch(0.75 0 0);
-  border-left-color: oklch(0.4 0 0);
 }

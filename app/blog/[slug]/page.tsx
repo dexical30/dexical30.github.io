@@ -1,10 +1,8 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { MDXRemote } from 'next-mdx-remote/rsc';
 import { getAllPosts, getPostBySlug } from '@/lib/blog';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
 
 export async function generateStaticParams() {
   const posts = getAllPosts();
@@ -13,17 +11,26 @@ export async function generateStaticParams() {
   }));
 }
 
+// generateStaticParams에서 정의되지 않은 slug는 404
+export const dynamicParams = false;
+
 export default async function PostPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const post = getPostBySlug(slug);
+  
+  // 메타데이터는 기존 방식으로 가져오기 (frontmatter 파싱)
+  const postMeta = getPostBySlug(slug);
 
-  if (!post) {
+  if (!postMeta) {
     notFound();
   }
+
+  // MDX 파일을 dynamic import로 가져오기
+  // mdx-components.tsx의 커스텀 컴포넌트가 자동으로 적용됨
+  const { default: Post } = await import(`@/content/posts/${slug}.mdx`);
 
   return (
     <article className="container mx-auto px-4 py-12 max-w-3xl">
@@ -34,13 +41,13 @@ export default async function PostPage({
       </Link>
 
       <header className="mb-8">
-        <h1 className="text-4xl font-bold mb-4">{post.metadata.title}</h1>
+        <h1 className="text-4xl font-bold mb-4">{postMeta.metadata.title}</h1>
         <p className="text-xl text-muted-foreground mb-4">
-          {post.metadata.description}
+          {postMeta.metadata.description}
         </p>
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          <time dateTime={post.metadata.date}>
-            {new Date(post.metadata.date).toLocaleDateString('ko-KR', {
+          <time dateTime={postMeta.metadata.date}>
+            {new Date(postMeta.metadata.date).toLocaleDateString('ko-KR', {
               year: 'numeric',
               month: 'long',
               day: 'numeric',
@@ -51,8 +58,8 @@ export default async function PostPage({
 
       <Separator className="mb-8" />
 
-      <div className="prose prose-neutral dark:prose-invert max-w-none">
-        <MDXRemote source={post.content} />
+      <div className="max-w-none">
+        <Post />
       </div>
     </article>
   );
