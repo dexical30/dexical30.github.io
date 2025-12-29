@@ -1,10 +1,11 @@
-import { notFound } from 'next/navigation';
-import Link from 'next/link';
-import { getAllPosts, getPostBySlug } from '@/lib/blog';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { TableOfContents } from '@/components/table-of-contents';
-import { extractHeadings } from '@/lib/toc';
+import { notFound } from "next/navigation";
+import Link from "next/link";
+import { getAllPosts, getPostBySlug } from "@/lib/blog";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { TableOfContents } from "@/components/table-of-contents";
+import { extractHeadings } from "@/lib/toc";
+import BlogLayout from "@/components/layout/blog-layout";
 
 export async function generateStaticParams() {
   const posts = getAllPosts();
@@ -22,7 +23,7 @@ export default async function PostPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  
+
   // 메타데이터는 기존 방식으로 가져오기 (frontmatter 파싱)
   const postMeta = getPostBySlug(slug);
 
@@ -38,7 +39,7 @@ export default async function PostPage({
   const headings = extractHeadings(postMeta.content);
 
   return (
-    <div className="container mx-auto px-4 py-12">
+    <BlogLayout>
       <div className="max-w-7xl mx-auto">
         <Link href="/blog">
           <Button variant="ghost" className="mb-8">
@@ -50,17 +51,22 @@ export default async function PostPage({
           {/* 메인 콘텐츠 */}
           <article className="flex-1 max-w-3xl relative">
             <header className="mb-8">
-              <h1 className="text-4xl font-bold mb-4">{postMeta.metadata.title}</h1>
+              <h1 className="text-4xl font-bold mb-4">
+                {postMeta.metadata.title}
+              </h1>
               <p className="text-xl text-muted-foreground mb-4">
                 {postMeta.metadata.description}
               </p>
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                 <time dateTime={postMeta.metadata.date}>
-                  {new Date(postMeta.metadata.date).toLocaleDateString('ko-KR', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
+                  {new Date(postMeta.metadata.date).toLocaleDateString(
+                    "ko-KR",
+                    {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    }
+                  )}
                 </time>
               </div>
             </header>
@@ -78,9 +84,8 @@ export default async function PostPage({
               </div>
             </aside>
           </article>
-
         </div>
       </div>
-    </div>
+    </BlogLayout>
   );
 }

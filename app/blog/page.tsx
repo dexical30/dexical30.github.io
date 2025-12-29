@@ -1,26 +1,33 @@
-import Link from 'next/link';
-import { getAllPosts } from '@/lib/blog';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import Link from "next/link";
+import { getAllPosts } from "@/lib/blog";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import BlogListHeader from "@/components/blog-list-header";
+import BlogLayout from "@/components/layout/blog-layout";
 
 export default function BlogPage() {
   const posts = getAllPosts();
 
   return (
-    <div className="container mx-auto px-4 py-12 max-w-4xl">
-      <div className="mb-12">
-        <h1 className="text-4xl font-bold mb-4">Blog</h1>
-        <p className="text-muted-foreground text-lg">
-          개발하면서 배운 것들과 생각들을 공유합니다.
-        </p>
-      </div>
+    <BlogLayout>
+      <BlogListHeader
+        title="Blog"
+        description="개발하면서 배운 것들과 생각들을 공유합니다."
+      />
 
       <Separator className="mb-8" />
 
       {posts.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-muted-foreground">아직 작성된 포스트가 없습니다.</p>
+          <p className="text-muted-foreground">
+            아직 작성된 포스트가 없습니다.
+          </p>
         </div>
       ) : (
         <div className="space-y-6">
@@ -42,10 +49,10 @@ export default function BlogPage() {
                 <CardContent>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <time dateTime={post.date}>
-                      {new Date(post.date).toLocaleDateString('ko-KR', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
+                      {new Date(post.date).toLocaleDateString("ko-KR", {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
                       })}
                     </time>
                   </div>
@@ -55,6 +62,6 @@ export default function BlogPage() {
           ))}
         </div>
       )}
-    </div>
+    </BlogLayout>
   );
 }
