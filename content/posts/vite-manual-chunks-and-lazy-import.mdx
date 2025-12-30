@@ -1,0 +1,506 @@
+---
+title: vite의 manualChunks와 lazy import
+description: vite와 lazy import로 번들 최적화하기
+date: 2025-12-30T23:40:00
+---
+
+# vite의 manualChunks와 lazy import
+
+## 목차
+
+1. [manualChunks란?](#manualchunks란)
+2. [Vendor 청크의 개념](#vendor-청크의-개념)
+3. [manualChunks의 장단점](#manualchunks의-장단점)
+4. [언제 사용하면 좋을까?](#언제-사용하면-좋을까)
+5. [lazy import vs manualChunks](#lazy-import-vs-manualchunks)
+6. [실전 예제](#실전-예제)
+
+---
+
+## manualChunks란?
+
+`manualChunks`는 Vite/Rollup에서 빌드 시 번들을 여러 청크로 분리하는 설정입니다. 이를 통해 번들 크기 관리, 캐싱 최적화, 코드 스플리팅을 제어할 수 있습니다.
+
+### 기본 사용법
+
+```javascript
+// vite.config.js
+export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // 특정 경로를 포함하는 모듈을 별도 청크로 분리
+          if (id.includes("components/Button")) {
+            return "button";
+          }
+          // node_modules는 vendor 청크로 분리
+          if (id.includes("node_modules")) {
+            return "vendor";
+          }
+        },
+      },
+    },
+  },
+});
+```
+
+---
+
+## Vendor 청크의 개념
+
+**Vendor**는 외부 라이브러리(node_modules)를 모은 청크입니다.
+
+### Vendor 청크의 역할
+
+1. **외부 라이브러리 분리**: React, React-DOM 등 `node_modules`의 의존성을 별도 파일로 분리
+2. **캐싱 최적화**: 앱 코드가 변경되어도 vendor는 그대로 유지되어 브라우저 캐시 재사용
+3. **번들 크기 관리**: vendor와 앱 코드를 분리하여 각각의 크기를 명확히 파악 가능
+
+### 빌드 결과 예시
+
+```
+dist/assets/
+├── vendor-1Tgj9msg.js    (554.55 kB) - React, React-DOM 등 외부 라이브러리
+├── index-CbTRnMBC.js      (3.02 kB)   - 앱 코드
+└── button-GnB0LjqK.js     (0.26 kB)   - Button 컴포넌트
+```
+
+---
+
+## manualChunks의 장단점
+
+### 장점
+
+#### 1. 캐싱 최적화
+
+- Vendor 청크는 앱 코드가 변경되어도 그대로 유지되어 브라우저 캐시 재사용
+- Button 컴포넌트가 변경되어도 vendor는 다시 다운로드하지 않음
+
+#### 2. 번들 크기 분석 용이
+
+- 각 청크의 크기를 명확히 파악 가능
+- 어떤 부분이 번들을 크게 만드는지 쉽게 확인
+
+#### 3. 코드 스플리팅 제어
+
+- 특정 컴포넌트를 별도 청크로 분리하여 필요할 때만 로드 가능
+- 동적 import와 함께 사용하면 더욱 효과적
+
+#### 4. 병렬 다운로드
+
+- 여러 청크를 동시에 다운로드하여 초기 로딩 시간 단축 가능
+
+### 단점
+
+#### 1. HTTP 요청 증가
+
+- 청크가 많아질수록 HTTP 요청 수가 증가
+- 작은 청크가 많으면 오히려 성능 저하 가능
+
+#### 2. 수동 관리 필요
+
+- 새로운 컴포넌트 추가 시 설정 업데이트 필요
+- 규칙이 복잡해지면 유지보수 비용 증가
+
+#### 3. 과도한 분리 시 비효율
+
+- Button 같은 작은 컴포넌트(0.26 kB)를 별도 청크로 분리하면 오버헤드가 클 수 있음
+- HTTP 헤더와 네트워크 지연 시간이 파일 크기보다 클 수 있음
+
+#### 4. 번들 최적화 제한
+
+- Vite/Rollup의 자동 최적화를 일부 제한할 수 있음
+- 잘못된 분리 전략은 오히려 성능 저하 유발
+
+---
+
+## 언제 사용하면 좋을까?
+
+### ✅ 사용하기 좋은 경우
+
+#### 1. 큰 외부 라이브러리 분리 (50KB 이상)
+
+```javascript
+manualChunks(id) {
+  if (id.includes('node_modules')) {
+    // React는 별도 청크로 분리
+    if (id.includes('react') || id.includes('react-dom')) {
+      return 'react-vendor';
+    }
+    // 큰 차트 라이브러리
+    if (id.includes('recharts') || id.includes('chart.js')) {
+      return 'chart-vendor';
+    }
+    return 'vendor';
+  }
+}
+```
+
+**이유**: 큰 라이브러리는 자주 변경되지 않아 캐싱 효과가 큼
+
+#### 2. 라우트 기반 코드 스플리팅
+
+```javascript
+manualChunks(id) {
+  if (id.includes('node_modules')) {
+    return 'vendor';
+  }
+  // 라우트별로 분리
+  if (id.includes('/pages/Admin')) {
+    return 'admin';
+  }
+  if (id.includes('/pages/Dashboard')) {
+    return 'dashboard';
+  }
+}
+```
+
+**이유**: 특정 페이지를 방문할 때만 해당 코드를 로드하여 초기 로딩 시간 단축
+
+#### 3. 기능 모듈 분리
+
+```javascript
+manualChunks(id) {
+  if (id.includes('node_modules')) {
+    return 'vendor';
+  }
+  // 특정 기능 모듈 분리
+  if (id.includes('/features/editor')) {
+    return 'editor';
+  }
+  if (id.includes('/features/analytics')) {
+    return 'analytics';
+  }
+}
+```
+
+**이유**: 특정 기능이 필요할 때만 로드하여 메인 번들 크기 감소
+
+#### 4. 서드파티 위젯/플러그인 분리
+
+```javascript
+manualChunks(id) {
+  if (id.includes('node_modules')) {
+    // 서드파티 위젯 분리
+    if (id.includes('tinymce') || id.includes('ckeditor')) {
+      return 'editor-widget';
+    }
+    if (id.includes('stripe') || id.includes('paypal')) {
+      return 'payment-widget';
+    }
+    return 'vendor';
+  }
+}
+```
+
+**이유**: 선택적으로 사용하는 위젯을 분리하여 필요할 때만 로드
+
+### ❌ 사용하지 않는 경우
+
+#### 1. 작은 컴포넌트 (1KB 미만)
+
+- HTTP 요청 오버헤드가 파일 크기보다 클 수 있음
+- 예: Button 컴포넌트(0.26 KB)는 메인 번들에 포함하는 것이 더 효율적
+
+#### 2. 자주 변경되는 코드
+
+- 자주 변경되는 코드를 분리하면 캐싱 이점이 줄어듦
+
+#### 3. 단순한 프로젝트
+
+- 작은 프로젝트에서는 자동 청킹으로 충분할 수 있음
+
+### 권장 전략
+
+```javascript
+manualChunks(id) {
+  // 1. 큰 외부 라이브러리 분리 (50KB 이상)
+  if (id.includes('node_modules')) {
+    // React는 별도로
+    if (id.includes('react') || id.includes('react-dom')) {
+      return 'react-vendor';
+    }
+    // 큰 차트/UI 라이브러리
+    if (id.includes('recharts') || id.includes('antd')) {
+      return 'ui-vendor';
+    }
+    // 나머지
+    return 'vendor';
+  }
+
+  // 2. 큰 기능 모듈만 분리 (10KB 이상)
+  if (id.includes('/pages/') && id.match(/\/pages\/[^/]+$/)) {
+    const match = id.match(/\/pages\/([^/]+)/);
+    if (match) {
+      return `page-${match[1]}`;
+    }
+  }
+
+  // 3. 나머지는 자동 청킹에 맡김
+}
+```
+
+---
+
+## lazy import vs manualChunks
+
+### lazy import (React.lazy)
+
+**목적**: 코드를 필요할 때만 로드 (코드 스플리팅)  
+**시점**: 런타임에 동적으로 로드  
+**사용**: 특정 기능/페이지를 선택적으로 로드할 때
+
+```javascript
+// App.jsx
+import { lazy, Suspense } from "react";
+
+// 큰 차트 라이브러리를 lazy import
+const ChartComponent = lazy(() => import("./components/Chart"));
+
+function App() {
+  const [showChart, setShowChart] = useState(false);
+
+  return (
+    <>
+      <button onClick={() => setShowChart(true)}>차트 보기</button>
+      {showChart && (
+        <Suspense fallback={<div>로딩...</div>}>
+          <ChartComponent />
+        </Suspense>
+      )}
+    </>
+  );
+}
+```
+
+### manualChunks
+
+**목적**: 빌드 시 청크를 분리하여 캐싱 최적화  
+**시점**: 빌드 타임에 청크 분리  
+**사용**: 항상 로드되지만 별도 파일로 분리하여 캐싱 이점을 얻을 때
+
+```javascript
+// vite.config.js
+manualChunks(id) {
+  if (id.includes('react') || id.includes('react-dom')) {
+    return 'react-vendor'; // 항상 로드되지만 별도 파일
+  }
+}
+```
+
+### 비교표
+
+| 특징              | lazy import      | manualChunks        |
+| ----------------- | ---------------- | ------------------- |
+| **목적**          | 필요할 때만 로드 | 캐싱 최적화         |
+| **시점**          | 런타임           | 빌드 타임           |
+| **사용 시나리오** | 선택적 기능      | 항상 필요한 코드    |
+| **HTTP 요청**     | 필요할 때만      | 초기 로드 시        |
+| **캐싱**          | 기능별로 분리    | 라이브러리별로 분리 |
+
+### 언제 무엇을 사용할까?
+
+#### lazy import를 사용하는 경우
+
+1. **선택적 기능**: 사용자가 특정 기능을 사용할 때만 로드
+
+   ```javascript
+   // 관리자 페이지는 관리자만 접근
+   const AdminPanel = lazy(() => import("./pages/Admin"));
+   ```
+
+2. **큰 라이브러리**: 특정 상황에서만 필요한 라이브러리
+
+   ```javascript
+   // PDF 뷰어는 PDF를 볼 때만 필요
+   const PDFViewer = lazy(() => import("./components/PDFViewer"));
+   ```
+
+3. **라우트 기반**: React Router와 함께 사용
+   ```javascript
+   const Home = lazy(() => import("./pages/Home"));
+   const About = lazy(() => import("./pages/About"));
+   ```
+
+#### manualChunks를 사용하는 경우
+
+1. **항상 필요한 라이브러리**: React, React-DOM 등
+
+   - 항상 로드되지만 별도 파일로 분리하여 캐싱
+
+2. **자주 변경되지 않는 코드**: 유틸리티, 공통 컴포넌트
+
+3. **캐싱 최적화**: 앱 코드가 바뀌어도 vendor는 그대로 유지
+
+### 함께 사용하기
+
+두 방식을 함께 사용할 수 있습니다:
+
+```javascript
+// vite.config.js
+manualChunks(id) {
+  if (id.includes('node_modules')) {
+    // React는 항상 필요하지만 별도 청크로 분리 (캐싱)
+    if (id.includes('react') || id.includes('react-dom')) {
+      return 'react-vendor';
+    }
+    // 큰 라이브러리는 별도 청크로 (lazy import와 함께 사용)
+    if (id.includes('recharts')) {
+      return 'chart-vendor';
+    }
+    return 'vendor';
+  }
+}
+```
+
+```javascript
+// App.jsx
+import { lazy, Suspense } from "react";
+
+// recharts는 lazy import로 필요할 때만 로드
+// 하지만 manualChunks로 별도 청크로 분리되어 있음
+const ChartPage = lazy(() => import("./pages/ChartPage"));
+
+function App() {
+  return (
+    <Suspense fallback={<div>로딩...</div>}>
+      <ChartPage /> {/* 이때 recharts 청크가 로드됨 */}
+    </Suspense>
+  );
+}
+```
+
+---
+
+## 실전 예제
+
+### 예제 1: React 앱 최적화
+
+```javascript
+// vite.config.js
+export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // React 관련 라이브러리
+          if (id.includes("react") || id.includes("react-dom")) {
+            return "react-vendor";
+          }
+
+          // 큰 UI 라이브러리
+          if (id.includes("antd") || id.includes("material-ui")) {
+            return "ui-vendor";
+          }
+
+          // 나머지 node_modules
+          if (id.includes("node_modules")) {
+            return "vendor";
+          }
+
+          // 라우트별 분리 (10KB 이상)
+          if (id.includes("/pages/")) {
+            const match = id.match(/\/pages\/([^/]+)/);
+            if (match) {
+              return `page-${match[1]}`;
+            }
+          }
+        },
+      },
+    },
+  },
+});
+```
+
+### 예제 2: lazy import와 함께 사용
+
+```javascript
+// App.jsx
+import { lazy, Suspense } from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+
+// 라우트별 lazy import
+const Home = lazy(() => import("./pages/Home"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Admin = lazy(() => import("./pages/Admin"));
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Suspense fallback={<div>로딩 중...</div>}>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/admin" element={<Admin />} />
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
+  );
+}
+```
+
+### 예제 3: 조건부 로딩
+
+```javascript
+// App.jsx
+import { lazy, Suspense, useState } from "react";
+
+// 큰 에디터 컴포넌트는 lazy import
+const RichTextEditor = lazy(() => import("./components/RichTextEditor"));
+
+function App() {
+  const [showEditor, setShowEditor] = useState(false);
+
+  return (
+    <>
+      <button onClick={() => setShowEditor(true)}>에디터 열기</button>
+      {showEditor && (
+        <Suspense fallback={<div>에디터 로딩 중...</div>}>
+          <RichTextEditor />
+        </Suspense>
+      )}
+    </>
+  );
+}
+```
+
+---
+
+## 결론
+
+### 핵심 요약
+
+1. **manualChunks**: 빌드 타임에 청크를 분리하여 캐싱 최적화
+
+   - 항상 필요한 코드 (React 등)
+   - 큰 외부 라이브러리 (50KB 이상)
+   - 자주 변경되지 않는 코드
+
+2. **lazy import**: 런타임에 필요할 때만 코드를 로드
+
+   - 선택적 기능
+   - 큰 라이브러리 (특정 상황에서만 필요)
+   - 라우트별 페이지
+
+3. **함께 사용**: 큰 라이브러리를 lazy import로 로드하고, manualChunks로 별도 청크로 분리
+
+### 권장 사항
+
+- ✅ React 같은 항상 필요한 라이브러리는 `manualChunks`로 분리
+- ✅ 차트나 에디터 같은 선택적 라이브러리는 `lazy import` + `manualChunks` 함께 사용
+- ❌ 작은 컴포넌트(1KB 미만)는 분리하지 않기
+- ❌ 자주 변경되는 코드는 분리하지 않기
+
+### 체크리스트
+
+번들링 전략을 수립할 때 다음을 고려하세요:
+
+- [ ] 청크 크기가 충분히 큰가? (최소 10KB 이상 권장)
+- [ ] 자주 변경되지 않는가?
+- [ ] 선택적으로 로드 가능한가?
+- [ ] 캐싱 이점이 명확한가?
+
+---
+
+**참고**: 이 가이드는 Vite 7.x 버전을 기준으로 작성되었습니다.
