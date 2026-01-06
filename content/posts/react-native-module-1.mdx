@@ -1,0 +1,373 @@
+---
+title: React Native 터보모듈 만들기 - 1
+description: React Naitve module 만들기
+date: 2025-01-07T02:02:00
+---
+
+# React Native 커스텀 Alert Turbo Module 개발기
+
+React Native에서 네이티브 Alert 다이얼로그를 호출하는 **Turbo Module** 라이브러리를 개발했습니다. pnpm 모노레포 환경에서 Android(Kotlin)와 iOS(Swift)를 모두 지원합니다.
+
+## 프로젝트 구조
+
+```
+react-native-lib-labs/
+├── apps/
+│   └── expo-app/          # Expo 앱 (테스트용)
+│       └── e2e/           # Maestro E2E 테스트
+├── libs/
+│   └── alert/             # @libs/react-native-alert 패키지
+│       ├── src/           # TypeScript
+│       ├── android/       # Kotlin 네이티브 코드
+│       └── ios/           # Swift + ObjC++ 네이티브 코드
+└── pnpm-workspace.yaml
+```
+
+## 1. pnpm 모노레포 구성
+
+pnpm workspace를 사용해서 모노레포를 구성했습니다.
+
+```yaml
+# pnpm-workspace.yaml
+packages:
+  - "apps/*"
+  - "libs/*"
+```
+
+## 2. Metro 설정 - 워크스페이스 패키지 Hot Reload
+
+모노레포에서 라이브러리 소스 파일을 수정했을 때 즉시 반영되도록 Metro를 설정했습니다.
+
+```javascript
+// metro.config.js
+const workspaceRoot = path.resolve(__dirname, "../..");
+
+config.watchFolders = [
+  ...config.watchFolders,
+  path.resolve(workspaceRoot, "libs"),
+  path.resolve(workspaceRoot, "node_modules"),
+];
+
+// 개발 환경에서 소스 파일 직접 참조
+if (process.env.NODE_ENV === "development") {
+  config.resolver.unstable_enablePackageExports = true;
+  config.resolver.unstable_conditionNames = [
+    "source", // package.json exports의 "source" 필드 우선 사용
+    "require",
+    "import",
+    "react-native",
+  ];
+}
+```
+
+라이브러리의 `package.json`에 `exports.source` 필드가 있으면 빌드된 파일 대신 소스 파일을 직접 사용합니다.
+
+## 3. TypeScript 인터페이스 설계
+
+```typescript
+// NativeReactNativeAlert.ts
+export type AlertAction = {
+  label: string;
+  role?: "default" | "cancel" | "destructive";
+  onPress?: () => void;
+};
+
+export type AlertOptions = {
+  title?: string;
+  message?: string;
+  actions: AlertAction[];
+  dismissible?: boolean; // Android only
+};
+
+// Turbo Module Spec
+export interface Spec extends TurboModule {
+  alert(options: Object): Promise<number>;
+}
+
+export default TurboModuleRegistry.getEnforcing<Spec>("ReactNativeAlert");
+```
+
+### 콜백 처리 전략
+
+`onPress` 콜백은 네이티브로 직접 전달할 수 없습니다. 대신:
+
+1. JavaScript에서 콜백들을 배열로 보관
+2. Native에 옵션 전달 (onPress 제외)
+3. Native에서 클릭된 버튼 index를 Promise로 반환
+4. JavaScript에서 해당 index의 콜백 실행
+
+```typescript
+// index.tsx
+export async function alert(options: AlertOptions): Promise<void> {
+  const callbacks = options.actions.map((action) => action.onPress);
+
+  const nativeOptions = {
+    ...options,
+    actions: options.actions.map(({ onPress, ...rest }) => rest),
+  };
+
+  const clickedIndex = await ReactNativeAlert.alert(nativeOptions);
+
+  if (clickedIndex >= 0 && clickedIndex < callbacks.length) {
+    callbacks[clickedIndex]?.();
+  }
+}
+```
+
+## 4. Android 네이티브 구현 (Kotlin)
+
+### DTO 레이어
+
+```kotlin
+// dto/AlertOptions.kt
+data class AlertOptions(
+  val title: String?,
+  val message: String?,
+  val actions: List<AlertAction>,
+  val dismissible: Boolean
+) {
+  companion object {
+    fun fromReadableMap(map: ReadableMap): AlertOptions { ... }
+  }
+}
+```
+
+### Service 레이어
+
+```kotlin
+// service/AlertService.kt
+class AlertService {
+  fun interface OnActionClickListener {
+    fun onClick(index: Int, action: AlertAction?)
+  }
+
+  fun show(activity: Activity, options: AlertOptions, listener: OnActionClickListener?) {
+    activity.runOnUiThread {
+      val builder = AlertDialog.Builder(activity).apply {
+        options.title?.let { setTitle(it) }
+        options.message?.let { setMessage(it) }
+        setCancelable(options.dismissible)
+      }
+      builder.setOnDismissListener {
+        listener?.onClick(clickedIndex, action)
+      }
+      builder.show()
+    }
+  }
+}
+```
+
+### Turbo Module
+
+```kotlin
+// ReactNativeAlertModule.kt
+@ReactModule(name = ReactNativeAlertModule.NAME)
+class ReactNativeAlertModule(reactContext: ReactApplicationContext) :
+  NativeReactNativeAlertSpec(reactContext) {
+
+  private val alertService = AlertService()
+
+  override fun alert(options: ReadableMap, promise: Promise) {
+    val alertOptions = AlertOptions.fromReadableMap(options)
+
+    reactApplicationContext.currentActivity?.let { activity ->
+      alertService.show(activity, alertOptions) { index, _ ->
+        promise.resolve(index)
+      }
+    }
+  }
+}
+```
+
+## 5. iOS 네이티브 구현 (Swift + Turbo Module)
+
+iOS에서는 **Adapter 패턴**을 사용해서 Turbo Module(ObjC++)과 Swift 비즈니스 로직을 연결했습니다.
+
+> 참고: [React Native 공식 문서 - Turbo Modules with Swift](https://reactnative.dev/docs/next/the-new-architecture/turbo-modules-with-swift)
+
+### 구조
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ReactNativeAlert.mm (Turbo Module)                         │
+│  └── ReactNativeAlertBridge 호출                            │
+└─────────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────────┐
+│  ReactNativeAlert.swift (@objcMembers)                      │
+│  └── ReactNativeAlertBridge - ObjC++ ↔ Swift 연결          │
+└─────────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────────┐
+│  순수 Swift Layer (ObjC 노출 없음)                          │
+│  ├── AlertService       # 비즈니스 로직 (class)            │
+│  ├── AlertOptions       # DTO (struct)                     │
+│  └── AlertAction        # DTO (struct)                     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Turbo Module (ObjC++)
+
+```objc
+// ReactNativeAlert.h
+#import <ReactNativeAlertSpec/ReactNativeAlertSpec.h>
+
+@interface ReactNativeAlert : NSObject <NativeReactNativeAlertSpec>
+@end
+
+// ReactNativeAlert.mm
+#import "ReactNativeAlert-Swift.h"
+
+@implementation ReactNativeAlert {
+    ReactNativeAlertBridge *_bridge;
+}
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _bridge = [ReactNativeAlertBridge new];
+    }
+    return self;
+}
+
+- (void)alert:(NSDictionary *)options
+      resolve:(RCTPromiseResolveBlock)resolve
+       reject:(RCTPromiseRejectBlock)reject {
+    [_bridge alertWithOptions:options completion:^(NSInteger clickedIndex) {
+        resolve(@(clickedIndex));
+    }];
+}
+
+- (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
+    (const facebook::react::ObjCTurboModule::InitParams &)params {
+    return std::make_shared<facebook::react::NativeReactNativeAlertSpecJSI>(params);
+}
+@end
+```
+
+### Swift Bridge (@objcMembers)
+
+```swift
+// ReactNativeAlert.swift
+@objcMembers public class ReactNativeAlertBridge: NSObject {
+  private let alertService = AlertService()
+
+  public func alert(options: NSDictionary, completion: @escaping (NSInteger) -> Void) {
+    let alertOptions = AlertOptions.fromDictionary(options)
+    alertService.show(options: alertOptions, completion: completion)
+  }
+}
+```
+
+### 순수 Swift DTO & Service
+
+```swift
+// dto/AlertOptions.swift
+public struct AlertOptions {
+  public let title: String?
+  public let message: String?
+  public let actions: [AlertAction]
+
+  public static func fromDictionary(_ dict: NSDictionary) -> AlertOptions { ... }
+}
+
+// dto/AlertAction.swift
+public struct AlertAction {
+  public let label: String
+  public let role: ActionRole
+
+  public static func fromDictionary(_ dict: [String: Any]) -> AlertAction? { ... }
+}
+
+// service/AlertService.swift
+public class AlertService {
+  public func show(options: AlertOptions, completion: ((Int) -> Void)?) {
+    DispatchQueue.main.async {
+      let alertController = UIAlertController(...)
+      // actions 매핑 및 표시
+    }
+  }
+}
+```
+
+### podspec 설정
+
+```ruby
+# ReactNativeAlert.podspec
+s.swift_version = "5.0"
+s.pod_target_xcconfig = {
+  "DEFINES_MODULE" => "YES",
+  "SWIFT_OBJC_INTERFACE_HEADER_NAME" => "ReactNativeAlert-Swift.h"
+}
+```
+
+## 사용 예시
+
+```tsx
+import { alert } from "@libs/react-native-alert";
+
+const handlePress = () => {
+  alert({
+    title: "확인",
+    message: "정말 삭제하시겠습니까?",
+    actions: [
+      {
+        label: "취소",
+        role: "cancel",
+        onPress: () => console.log("취소됨"),
+      },
+      {
+        label: "삭제",
+        role: "destructive",
+        onPress: () => console.log("삭제 실행!"),
+      },
+    ],
+  });
+};
+```
+
+## 6. E2E 테스트 (Maestro)
+
+[Maestro](https://maestro.mobile.dev/)를 사용해서 E2E 테스트를 작성했습니다. YAML로 간단하게 UI 테스트 플로우를 정의할 수 있습니다.
+
+```yaml
+# e2e/flow.yaml
+appId: com.example.expoapp
+---
+- launchApp
+- tapOn: "Alert"
+- tapOn:
+    id: "open-alert-button"
+- takeScreenshot: ./screenshots/AlertScreen.png
+```
+
+### 실행 방법
+
+```bash
+# Maestro 설치
+brew install maestro
+
+# 테스트 실행 (iOS 시뮬레이터 또는 Android 에뮬레이터 필요)
+maestro test e2e/flow.yaml
+```
+
+### Maestro 장점
+
+- **YAML 기반**: 코드 없이 간단한 테스트 작성
+- **크로스 플랫폼**: 동일한 플로우로 iOS/Android 테스트
+- **스크린샷**: 자동 스크린샷 캡처로 시각적 검증
+- **빠른 피드백**: 실시간으로 테스트 결과 확인
+
+## 배운 점
+
+1. **Turbo Module**: Android와 iOS 모두 Turbo Module로 통일하여 JSI 직접 호출의 성능 이점 활용
+2. **Adapter 패턴**: iOS에서 ObjC++ Turbo Module과 순수 Swift 코드를 깔끔하게 연결
+3. **콜백 처리**: 네이티브 → JS 콜백은 Promise로 index를 반환하는 패턴이 효과적
+4. **레이어 분리**: DTO와 Service를 분리하면 코드 재사용성과 테스트 용이성이 높아짐
+5. **Maestro E2E**: YAML로 간단하게 네이티브 모듈 동작 검증 가능
+
+## 다음 목표
+
+- 애니메이션 커스터마이징
+- Action Sheet 스타일 지원
+- 다크모드 대응
