@@ -1,0 +1,234 @@
+RN TurboModule로 오디오 스트리밍 + SSAI 광고 구축 설계
+
+목표: **React Native 환경에서 TurboModule 기반 네이티브 플레이어(iOS AVPlayer / Android ExoPlayer)**를 제공하고, SSAI(Server-Side Ad Insertion) 방식으로 광고가 섞인 HLS(m3u8)를 재생한다.
+광고 재생은 플레이어가 수행하고, 앱은 **광고 상태(시작/종료/스킵가능/스킵수행)**를 인지·UI 반영·이벤트 로깅만 한다.
+
+⸻
+
+1. 전체 아키텍처 개요
+
+1.1 구성 요소
+• Media Plane (CDN/Storage)
+• 콘텐츠/광고를 HLS 세그먼트로 보관
+• 예: content/..../audio*###.ts, ads/.../ad*###.ts
+• Control Plane (Backend: Node/Next/Nest/Express)
+• 사용자/세션별로 광고를 결정
+• 콘텐츠 + 광고를 섞은 동적 playlist(m3u8) 생성
+• 광고 구간을 #EXT-X-DATERANGE로 표식
+• Client Plane (RN + TurboModule)
+• 네이티브: AVPlayer/ExoPlayer로 재생
+• 앱: 광고 메타데이터 이벤트를 받아 UI/로그 처리
+
+⸻
+
+2. 도표
+
+2.1 데이터 흐름
+
+RN App (JS)
+| play({ playlistUrl })
+v
+TurboModule (JSI) -------------------------------
+| |
+v |
+Native Player (iOS AVPlayer / Android ExoPlayer) |
+| GET playlist(m3u8) |
+v |
+Backend (playlist generator) |
+| returns m3u8 with ad segments + DATERANGE |
+v |
+CDN/Storage: content segments + ad segments |
+^ |
+| GET _.ts / _.aac segments |
+'-----------------------------------------------'
+
+JS receives events:
+
+- onStateChange (loading/playing/buffering/ended/error)
+- onAdEvent (adStart/adEnd/adSkippable/skip)
+
+2.2 SSAI playlist 조합 개념
+
+[content.m3u8] [ad.m3u8]
+seg1.ts ad1.ts
+seg2.ts ad2.ts
+seg3.ts ad3.ts
+\ /
+\ /
+v v
+[backend joins segments + adds DATERANGE]
+
+-> merged.m3u8
+seg1.ts
+seg2.ts
+#EXT-X-DATERANGE (ad marker)
+ad1.ts
+ad2.ts
+ad3.ts
+seg3.ts
+
+⸻
+
+3. 핵심 선택: 스트리밍 포맷과 광고 방식
+
+3.1 포맷
+• HLS (m3u8) + segment(ts/aac/fmp4)
+• iOS: AVPlayer가 HLS에 최적
+• Android: ExoPlayer가 HLS/DASH 모두 지원
+
+3.2 광고 방식
+• SSAI 권장
+• 서버가 playlist를 동적으로 생성
+• 클라이언트는 광고를 “재생”하지 않고 “인지”만
+
+⸻
+
+4. Media 준비 (콘텐츠/광고 HLS 생성)
+
+4.1 ffmpeg로 오디오 HLS(VOD) 만들기 (예시)
+• 콘텐츠/광고 모두 동일 파이프라인으로 생성
+
+ffmpeg -i audio.mp3 -vn -c:a aac -b:a 128k \
+ -hls*time 6 -hls_playlist_type vod \
+ -hls_segment_filename "audio*%03d.ts" \
+ audio.m3u8
+
+산출물
+• audio.m3u8
+• audio_000.ts, audio_001.ts …
+
+⸻
+
+5. Backend: SSAI playlist generator 설계
+
+5.1 엔드포인트
+• GET /playlist?contentId=...&userId=...
+• 반환: 세션별로 조합된 m3u8 텍스트
+
+5.2 서버가 결정하는 것
+• 광고 삽입 여부
+• 광고 캠페인 선택
+• 광고 위치(Pre/Mid/Post)
+• 스킵 가능 여부 및 오프셋
+
+5.3 DATERANGE로 광고 구간 표식
+
+예시 (개념):
+
+#EXT-X-DATERANGE:ID="ad-1",CLASS="ad",DURATION=15.0,X-SKIPPABLE=YES,X-SKIP-OFFSET=5
+
+주의: #EXT-X-DATERANGE는 ffmpeg 자동 기능이 아니라 서버에서 playlist 텍스트를 생성/수정하면서 삽입한다.
+
+⸻
+
+6. RN TurboModule API 설계
+
+6.1 JS API (권장)
+
+type PlayParams = {
+playlistUrl: string; // 서버가 내려주는 m3u8
+headers?: Record<string, string>; // 필요 시(토큰 등)
+};
+
+type PlayerState = 'idle'|'loading'|'playing'|'buffering'|'paused'|'ended'|'error';
+
+type AdEvent =
+| { type: 'adStart'; adId: string; duration: number; skippable: boolean; skipOffset?: number }
+| { type: 'adEnd'; adId: string }
+| { type: 'adSkippable'; adId: string }
+| { type: 'adSkipped'; adId: string };
+
+interface AudioStreamModule {
+setup(): Promise<void>;
+play(params: PlayParams): Promise<void>;
+pause(): Promise<void>;
+stop(): Promise<void>;
+seekTo(seconds: number): Promise<void>; // 정책에 따라 제한
+getCurrentTime(): Promise<number>;
+addListener(event: 'onStateChange'|'onAdEvent', cb: (payload: any) => void): void;
+removeListeners(count: number): void;
+}
+
+6.2 정책(중요)
+• 광고 중 seekTo()는 원칙적으로 금지
+• 스킵 허용 광고라면:
+• skipOffset 이후에만
+• seekTo(adEndTime)만 허용
+
+⸻
+
+7. iOS 구현 포인트 (AVPlayer)
+
+7.1 필수: 오디오 세션
+• AVAudioSession은 재생을 “하는” 것이 아니라 재생 환경을 설정
+• 카테고리: .playback
+
+7.2 HLS 재생
+• AVPlayerItem(url: playlistUrl) → AVPlayer.play()
+
+7.3 상태 전파
+• AVPlayerItem.status / timeControlStatus를 관찰
+• loading/buffering/playing/ended/error를 JS로 emit
+
+7.4 광고 이벤트 인지
+• #EXT-X-DATERANGE → Timed Metadata로 전달
+• iOS에서 메타데이터를 받아:
+• 광고 시작/종료
+• 스킵 가능 시점
+• adId/duration
+• 를 JS로 emit
+
+구현 난이도를 낮추려면: 처음엔 광고 이벤트 없이(단순 SSAI) → 이후 DATERANGE 인지 추가.
+
+7.5 스킵(Seek)
+• 스킵 = seek(to: adEndTime)
+• toleranceBefore/After = .zero로 정확히 이동
+
+⸻
+
+8. Android 구현 포인트 (ExoPlayer)
+   • HLS 재생: HlsMediaSource 또는 ExoPlayer의 자동 선택
+   • 광고 메타데이터:
+   • HLS playlist tag를 이벤트로 받는 경로를 구성(메타데이터 출력/리스너)
+   • iOS와 동일한 AdEvent 모델로 JS emit
+
+Android는 기기/버전 다양성 때문에, 먼저 재생 안정화 후 광고 메타데이터 수집을 붙이는 흐름이 좋다.
+
+⸻
+
+9. 개발 순서 (추천)
+   1. 로컬 HLS 생성 (ffmpeg로 content/ad 각각)
+   2. 정적 서버로 서빙 (m3u8 + segment)
+   3. iOS: AVPlayer로 HLS 재생 (TurboModule 전, 네이티브 앱에서)
+   4. RN: TurboModule에서 play/pause/stop 연결
+   5. Backend: GET /playlist로 동적 m3u8 제공
+   6. SSAI: 광고 segment를 playlist에 삽입
+   7. 앱: 광고 시작/종료 인지(DATERANGE) 이벤트 연결
+   8. 스킵 광고: skippable + skipOffset 정책 도입
+   9. 로그/분석: adStart/adEnd/adSkipped를 서버로 전송
+
+⸻
+
+10. 운영 시 고려사항
+    • HTTPS/ATS: 실서비스는 HTTPS 필수
+    • CORS: RN 환경에서 필요하면 서버에서 헤더 설정
+    • Range/MIME: CDN에서 m3u8/ts MIME 타입 및 range 지원 확인
+    • 캐시: AVPlayer/ExoPlayer는 캐시를 OS/플레이어가 관리(앱 스토리지 누수 아님)
+    • DRM: iOS(FairPlay), Android(Widevine)로 분기 설계(별도 단계)
+
+⸻
+
+11. 체크리스트
+    • 서버 로그에 _.m3u8 → _.ts 순차 요청이 찍힌다
+    • iOS 실기기에서 재생/백그라운드 재생이 된다
+    • RN에서 play/pause/stop가 정상 동작한다
+    • SSAI playlist에 광고 segment를 섞어도 재생이 끊기지 않는다
+    • DATERANGE 기반 광고 start/end 이벤트가 JS로 전달된다
+    • 스킵 정책이 강제(임의 seek 차단)된다
+
+⸻
+
+12. 다음 작업 제안
+    • iOS: DATERANGE 메타데이터 수신 경로를 구체 코드로 확정
+    • Backend: playlist generator의 최소 구현(문자열 템플릿 조합)
+    • RN: 이벤트 emitter 표준화(상태/광고/에러)

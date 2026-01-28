@@ -1,0 +1,179 @@
+---
+title: Cloudflare Tunnel 삽질기: config.yml은 왜 계속 무시됐을까
+description: tunnel은 cloudflare가 덮어쓴다
+date: 2026-01-28T14:10:00
+---
+
+최근 로컬 서버(Node/Nest/FastAPI)를 Cloudflare Tunnel로 외부에 노출하는 작업을 하다가, 꽤 깊은 삽질을 했다.
+겉으로 보면 단순히 ingress → localhost:3000 설정인데, 아무리 설정을 바꿔도 항상 404로 떨어지는 상황이었다.
+
+결론부터 말하면 문제는 Cloudflare Dashboard의 Remote Ingress 설정이 로컬 config.yml을 계속 덮어쓰고 있었기 때문이었다.
+
+이 글은 그 과정을 기록한 디버깅 노트다.
+
+⸻
+
+1. 목표 구조
+
+churchpastor-dev-api.zenithmaker.com
+→ Cloudflare Tunnel
+→ cloudflared (local)
+→ http://localhost:3000
+
+config.yml은 아래처럼 아주 평범했다.
+
+tunnel: <TUNNEL_ID>
+credentials-file: ~/.cloudflared/<TUNNEL_ID>.json
+
+protocol: http2
+
+ingress:
+
+- hostname: churchpastor-dev-api.zenithmaker.com
+  service: http://localhost:3000
+
+- service: http_status:404
+
+⸻
+
+2. 이상 증상
+   • Tunnel은 정상적으로 연결됨 (Registered tunnel connection)
+   • 요청도 들어옴 (GET https://churchpastor-dev-api...)
+   • 하지만 항상 아래 로그로 끝남
+
+ingressRule=1 originService=http_status:404
+
+즉,
+• 0번 규칙(hostname → localhost:3000)은 매칭 실패
+• 1번 규칙(404 catch-all)로 떨어짐
+
+“hostname이 정확히 같은데 왜 안 맞지?“라는 의문이 시작됐다.
+
+⸻
+
+3. 초반에 헷갈렸던 포인트들
+
+(1) CLI 실행 방식
+
+Cloudflared CLI는 옵션 위치에 매우 민감하다.
+
+# ❌ config 무시됨
+
+cloudflared tunnel run macbook
+
+# ❌ --config 위치 오류
+
+cloudflared tunnel run --config ~/.cloudflared/config.yml
+
+# ✅ 정답
+
+cloudflared tunnel --config ~/.cloudflared/config.yml run
+
+run <tunnel-name>을 쓰는 순간 quick-run 모드가 되며,
+config.yml의 ingress / protocol 설정은 전부 무시된다.
+
+⸻
+
+(2) ingress 마지막 규칙 제약
+
+cloudflared는 마지막 ingress rule이 반드시 catch-all이어야 한다.
+
+아래는 에러가 난다.
+
+# ❌ 마지막 규칙에 hostname 있음
+
+- hostname: "\*.example.com"
+  service: http://localhost:3000
+
+이건 맞게 설정했는데도 계속 문제가 발생했다.
+
+⸻
+
+4. 결정적 단서: Updated to new configuration 로그
+
+디버그 로그를 자세히 보니, 이런 줄이 계속 찍히고 있었다.
+
+INF Updated to new configuration config={
+"ingress":[
+{
+"hostname":"churchpastor-api.zenithmaker.com",
+"service":"http://localhost:3000"
+},
+{
+"service":"http_status:404"
+}
+]
+}
+
+여기서 중요한 점:
+
+내 로컬 config에는 churchpastor-dev-api를 썼는데,
+실제 적용된 ingress에는 -dev-가 빠져 있었다.
+
+즉, 내가 수정한 config.yml이 아니라,
+Cloudflare 쪽에서 내려준 다른 ingress 설정이 최종 적용되고 있었던 것이다.
+
+⸻
+
+5. 진짜 원인: Cloudflare Dashboard의 Remote Ingress
+
+Cloudflare Tunnel은 두 가지 설정 소스를 가진다. 1. 로컬 config.yml 2. Cloudflare Dashboard (Zero Trust / Tunnel)의 Remote configuration
+
+그리고 기본적으로:
+
+Remote config가 로컬 config보다 우선한다.
+
+Dashboard에 이미 등록돼 있던 설정:
+
+churchpastor-api.zenithmaker.com → http://localhost:3000
+
+이 설정이 계속 엣지에서 내려오면서,
+로컬에서 아무리 churchpastor-dev-api...로 바꿔도
+몇 초 뒤 다시 덮어써지고 있었던 것이다.
+
+⸻
+
+6. 해결 (방법 A)
+
+Cloudflare Dashboard에서 직접 ingress를 수정했다.
+
+경로:
+
+Cloudflare Dashboard
+→ Zero Trust
+→ Networks
+→ Tunnels
+→ 해당 Tunnel
+→ Public Hostnames / Ingress
+
+여기서 hostname을 다음 중 하나로 수정:
+• churchpastor-dev-api.zenithmaker.com
+• 또는 \*.zenithmaker.com
+
+저장 후 즉시 정상 동작.
+
+ingressRule=0 originService=http://localhost:3000
+
+⸻
+
+7. 배운 점 정리
+   1. Updated to new configuration 로그는 Remote config 적용 신호다
+   2. Cloudflare Tunnel에서 404는 대부분 “연결 실패”가 아니라 “매칭 실패”
+   3. 운영/협업 환경에서는 Dashboard 중심 관리가 정석
+   4. 로컬 config.yml은 보조 수단으로 생각하는 게 마음 편하다
+
+⸻
+
+마무리
+
+이번 이슈는 네트워크, DNS, 서버 문제가 아니었다.
+
+문제는 항상 “어디가 최종 진실(Source of Truth)인가”였다.
+
+Cloudflare Tunnel을 쓰면서
+• 요청은 들어오는데
+• 항상 404만 나온다면
+
+로컬 config보다 먼저 Dashboard ingress부터 의심해보자.
+
+이 글이 같은 삽질을 줄이는 데 도움이 되길 바란다.
