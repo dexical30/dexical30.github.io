@@ -1,8 +1,8 @@
 {
-  "devlog": 2,
-  "blog": 2,
-  "seo": 1,
-  "performance": 1,
+  "devlog": 1,
+  "blog": 1,
   "nextjs": 1,
-  "obsidian": 1
+  "obsidian": 1,
+  "github-pages": 1,
+  "claude": 1
 }

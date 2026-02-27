@@ -41,7 +41,6 @@ yarn
 **레포의 `data` 디렉터리를 Obsidian 안의 폴더에 심볼릭 링크로 연결**해서 사용합니다.
 
 1. Obsidian에서 사용 중인 저장소(vault) 또는 폴더 경로를 확인합니다. 예시:
-
    - `/Users/USER/Obsidian/MyVault/blog-data`
 
 2. 현재 레포 루트(예: `dexical30.github.io`)에서, `data` 디렉터리를 Obsidian 폴더와 연결합니다.
@@ -62,8 +61,9 @@ yarn
 4. Obsidian에서 작성/수정한 문서는 곧바로 이 레포의 `data` 아래에 반영되며,  
    Next.js 개발 서버를 통해 미리볼 수 있습니다.
 
-> **주의**  
-> - 위 경로(`/Users/USER/Obsidian/MyVault/blog-data`)는 예시이므로 본인 환경에 맞게 수정해야 합니다.  
+> **주의**
+>
+> - 위 경로(`/Users/USER/Obsidian/MyVault/blog-data`)는 예시이므로 본인 환경에 맞게 수정해야 합니다.
 > - Obsidian 폴더 구조에 맞춰 `data/blog`, `data/authors` 등이 들어 있도록 구성하면
 >   기존 Contentlayer 설정을 그대로 활용할 수 있습니다.
 
@@ -137,5 +137,5 @@ EXPORT=1 UNOPTIMIZED=1 yarn build
 
 요약하면, 배포 플로우는 다음과 같습니다.
 
-- **로컬**: `./scripts/deploy-gh-pages.sh` → `gh-pages` 브랜치 업데이트  
+- **로컬**: `./scripts/deploy-gh-pages.sh` → `gh-pages` 브랜치 업데이트
 - **GitHub Actions**: `.github/workflows/pages.yml` → GitHub Pages에 반영

@@ -35,7 +35,7 @@ jobs:
       - name: Upload static files from gh-pages
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./  # gh-pages 브랜치의 정적 파일 전체
+          path: ./ # gh-pages 브랜치의 정적 파일 전체
 
       - name: Deploy to GitHub Pages
         id: deployment
