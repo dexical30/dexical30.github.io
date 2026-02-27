@@ -7,7 +7,7 @@ import { notFound } from 'next/navigation'
 
 const POSTS_PER_PAGE = 5
 
-export const generateStaticParams = async () => {
+export async function generateStaticParams() {
   const tagCounts = tagData as Record<string, number>
   return Object.keys(tagCounts).flatMap((tag) => {
     const postCount = tagCounts[tag]

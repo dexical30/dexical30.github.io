@@ -10,7 +10,7 @@
     "analyze": "cross-env ANALYZE=true next build",
     "lint": "next lint --fix --dir pages --dir app --dir components --dir lib --dir layouts --dir scripts",
     "prepare": "husky",
-    "deploy": "yarn prettier --write . && yarn build && ./scripts/deploy-gh-pages.sh"
+    "deploy": "yarn prettier --write . && ./scripts/deploy-gh-pages.sh"
   },
   "dependencies": {
     "@headlessui/react": "2.2.9",

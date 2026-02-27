@@ -18,9 +18,9 @@ echo "1) 의존성 설치 (yarn)"
 yarn install --immutable
 
 echo "2) 정적 빌드 (out 디렉터리 생성)"
-export EXPORT=1
-export UNOPTIMIZED=1
-export BASE_PATH=""  # GitHub Pages 루트에 배포하는 경우 비워둡니다.
+# export EXPORT=1
+# export UNOPTIMIZED=1
+# export BASE_PATH=""  # GitHub Pages 루트에 배포하는 경우 비워둡니다.
 yarn build
 
 echo "3) gh-pages 브랜치에 out 디렉터리만 force-push"
