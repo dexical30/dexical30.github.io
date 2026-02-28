@@ -28,12 +28,15 @@ jobs:
         with:
           ref: gh-pages
 
-      - name: Prepare artifact directory
+      - name: Prepare static files for Pages
         run: |
-          # .git 제외한 정적 파일만 복사 (심볼릭 링크 이슈 방지)
-          rsync -av --exclude='.git' . artifact/
-          # 빈 디렉터리면 실패시켜 원인 파악
-          test -n "$(ls -A artifact)" || { echo "No static files in gh-pages"; exit 1; }
+          # 업로드 검증 실패 방지: .git 제거 (심볼릭 링크 포함됨)
+          rm -rf .git
+          # 빈 디렉터리면 즉시 실패
+          test -n "$(ls -A .)" || { echo "::error::No static files in gh-pages branch"; exit 1; }
+          echo "Contents to upload:"
+          ls -la
+          du -sh .
 
       - name: Configure Pages
         id: configurepages
@@ -42,7 +45,7 @@ jobs:
       - name: Upload static files from gh-pages
         uses: actions/upload-pages-artifact@v3
         with:
-          path: artifact
+          path: .
 
       - name: Deploy to GitHub Pages
         id: deployment
