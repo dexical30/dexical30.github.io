@@ -1,0 +1,47 @@
+name: Deploy contents to GitHub Pages
+
+on:
+  push:
+    branches:
+      - gh-pages
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: 'pages'
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+
+      - name: Prepare static files for Pages
+        run: |
+          # 업로드 검증 실패 방지: .git 및 불필요한 dotfile 제거
+          rm -rf .git
+          rm -rf .github
+
+      - name: Configure Pages
+        id: configurepages
+        uses: actions/configure-pages@v5
+
+      - name: Upload static files from gh-pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
