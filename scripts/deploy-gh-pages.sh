@@ -24,7 +24,7 @@ export BASE_PATH=""  # GitHub Pages 루트에 배포하는 경우 비워둡니�
 yarn build
 
 echo "3) gh-pages 브랜치에 out 디렉터리만 force-push"
-npx --yes gh-pages -d out -b gh-pages -m "Deploy to gh-pages" --dotfiles
+npx --yes gh-pages -d out -b gh-pages -m "Deploy to gh-pages"
 
 echo "✅ gh-pages 배포가 완료되었습니다."
 

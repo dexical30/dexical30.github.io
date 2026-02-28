@@ -30,8 +30,11 @@ jobs:
 
       - name: Prepare static files for Pages
         run: |
-          # 업로드 검증 실패 방지: .git 제거 (심볼릭 링크 포함됨)
+          # 업로드 검증 실패 방지: .git 및 불필요한 dotfile 제거
           rm -rf .git
+          rm -f .yarnrc.yml .gitignore .env .env.* 2>/dev/null || true
+          # Pages 서빙에 필요한 항목만 남기고 나머지 dotfile 제거 (검증 이슈 방지)
+          find . -maxdepth 1 -name '.*' -type f -delete
           # 빈 디렉터리면 즉시 실패
           test -n "$(ls -A .)" || { echo "::error::No static files in gh-pages branch"; exit 1; }
           echo "Contents to upload:"
