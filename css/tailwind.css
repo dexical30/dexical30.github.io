@@ -6,6 +6,10 @@
 
 /* Core theme configuration */
 @theme {
+  /* Post layout */
+  --breakpoint-post-xl: 90rem;
+  --container-post: 50rem;
+
   /* Font families */
   --font-sans:
     var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',

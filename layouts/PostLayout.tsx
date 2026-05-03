@@ -5,7 +5,6 @@ import Comments from '@/components/Comments'
 import Link from '@/components/Link'
 import PageTitle from '@/components/PageTitle'
 import SectionContainer from '@/components/SectionContainer'
-import Image from '@/components/Image'
 import Tag from '@/components/Tag'
 import siteMetadata from '@/data/siteMetadata'
 import ScrollTopAndComment from '@/components/ScrollTopAndComment'
@@ -41,57 +40,52 @@ export default function PostLayout({ content, authorDetails, next, prev, childre
     <SectionContainer>
       <ScrollTopAndComment />
       <article>
-        <div className="xl:divide-y xl:divide-gray-200 xl:dark:divide-gray-700">
-          <header className="pt-6 xl:pb-6">
-            <div className="space-y-1 text-center">
-              <dl className="space-y-10">
-                <div>
-                  <dt className="sr-only">Published on</dt>
-                  <dd className="text-base leading-6 font-medium text-gray-500 dark:text-gray-400">
-                    <time dateTime={date}>
-                      {new Date(date).toLocaleDateString(siteMetadata.language, postDateTemplate)}
-                    </time>
-                  </dd>
-                </div>
-              </dl>
+        <header className="max-w-post mx-auto pt-6">
+          <div className="space-y-1 border-b border-gray-200 pb-6 text-center dark:border-gray-700">
+            <dl className="space-y-10">
               <div>
-                <PageTitle>{title}</PageTitle>
+                <dt className="sr-only">Published on</dt>
+                <dd className="text-base leading-6 font-medium text-gray-500 dark:text-gray-400">
+                  <time dateTime={date}>
+                    {new Date(date).toLocaleDateString(siteMetadata.language, postDateTemplate)}
+                  </time>
+                </dd>
               </div>
+            </dl>
+            <div>
+              <PageTitle>{title}</PageTitle>
             </div>
-          </header>
-          <div className="grid-rows-[auto_1fr] divide-y divide-gray-200 pb-8 xl:grid xl:grid-cols-4 xl:gap-x-6 xl:divide-y-0 dark:divide-gray-700">
-            <div className="divide-y divide-gray-200 xl:col-span-3 xl:row-span-2 xl:pb-0 dark:divide-gray-700">
-              <div className="prose dark:prose-invert max-w-none pt-10 pb-8">{children}</div>
-              <div className="pt-6 pb-6 text-sm text-gray-700 dark:text-gray-300">
-                <Link href={discussUrl(path)} rel="nofollow">
-                  Discuss on Twitter
-                </Link>
-                {` • `}
-                <Link href={editUrl(filePath)}>View on GitHub</Link>
-              </div>
-              {siteMetadata.comments && (
-                <div
-                  className="pt-6 pb-6 text-center text-gray-700 dark:text-gray-300"
-                  id="comment"
-                >
-                  <Comments slug={slug} />
-                </div>
-              )}
-            </div>
-            {/* Side TOC */}
-            <aside className="hidden xl:col-span-1 xl:row-span-2 xl:block dark:divide-gray-700">
-              <BrowserSticky offsetTop={tocOffsetTop} className="h-full">
-                <div className="pt-10 pb-8">
-                  <h2 className="text-xs tracking-wide text-gray-500 uppercase dark:text-gray-400">
-                    On this page
-                  </h2>
-                  <div className="pt-4">
-                    <TOC toc={toc} fromHeading={2} toHeading={4} />
-                  </div>
-                </div>
-              </BrowserSticky>
-            </aside>
           </div>
+        </header>
+        <div className="relative">
+          <div className="max-w-post mx-auto divide-y divide-gray-200 pb-8 dark:divide-gray-700">
+            <div className="prose dark:prose-invert max-w-none pt-10 pb-8">{children}</div>
+            <div className="pt-6 pb-6 text-sm text-gray-700 dark:text-gray-300">
+              <Link href={discussUrl(path)} rel="nofollow">
+                Discuss on Twitter
+              </Link>
+              {` • `}
+              <Link href={editUrl(filePath)}>View on GitHub</Link>
+            </div>
+            {siteMetadata.comments && (
+              <div className="pt-6 pb-6 text-center text-gray-700 dark:text-gray-300" id="comment">
+                <Comments slug={slug} />
+              </div>
+            )}
+          </div>
+          {/* Side TOC */}
+          <aside className="post-xl:absolute post-xl:inset-y-0 post-xl:left-[calc(50%+25rem+3rem)] post-xl:block post-xl:w-64 hidden">
+            <BrowserSticky offsetTop={tocOffsetTop} className="h-full">
+              <div className="pt-10 pb-8">
+                <h2 className="text-xs tracking-wide text-gray-500 uppercase dark:text-gray-400">
+                  On this page
+                </h2>
+                <div className="pt-4">
+                  <TOC toc={toc} fromHeading={2} toHeading={4} />
+                </div>
+              </div>
+            </BrowserSticky>
+          </aside>
         </div>
       </article>
     </SectionContainer>
