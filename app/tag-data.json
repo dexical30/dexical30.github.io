@@ -1,10 +1,18 @@
 {
-  "javascript": 1,
   "devlog": 1,
   "blog": 1,
   "nextjs": 1,
   "obsidian": 1,
   "github-pages": 1,
   "claude": 1,
-  "computer-science": 1
+  "computer-science": 1,
+  "javascript": 3,
+  "v8": 1,
+  "scope": 1,
+  "closure": 1,
+  "lexical-environment": 1,
+  "ecmascript": 1,
+  "prototype": 1,
+  "object": 1,
+  "inheritance": 1
 }
